@@ -23,9 +23,8 @@ class COMSettings(object):
             self.local_port = int(config["Local"]["Port"])
             self.start_up_position = config["PrgSet"]["StartUpPosition"]
             self.connect_to_server = config["PrgSet"]["ConnectToServer"]
-            self.count_span = config["PrgSet"]["CountSpan"]
+            self.count_span = int(config["PrgSet"]["CountSpan"])
             self.create_log = config["PrgSet"]["CreateLogFile"]
-            self.cell_list = config["PrgSet"]["CellList"]
 
             a = self.initPort()
 
@@ -52,18 +51,16 @@ class COMSettings(object):
 
 class Registers(object):
     def __init__(self):
-        self.temp = '-10'
-        self.serial = '-10'
-        self.bat = '-10'
+        self.temp = '0'
+        self.serial = '0'
+        self.bat = '0'
 
 
 class DataSens(object):
     def __init__(self):
         self.sens = []
-        self.state = 'off'
-        self.data_list = []
 
 
-class DataCam(object):
+class DataSpan(object):
     def __init__(self):
-        self.cam = []
+        self.span = []

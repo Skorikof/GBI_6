@@ -1,4 +1,5 @@
 import sys
+import time
 
 from Controller import ChangeUi
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QStyle, QAction, QMenu, qApp
@@ -16,12 +17,12 @@ class ApplicationWindow(ChangeUi):
             self.tray_icon = QSystemTrayIcon(self)
             self.tray_icon.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
             self.tray_icon.setToolTip('Температура бетона')
-            show_action = QAction("Развернуть программу", self)
+            # show_action = QAction("Развернуть программу", self)
             quit_action = QAction("Выход из программы", self)
-            show_action.triggered.connect(self.showNormal)
+            # show_action.triggered.connect(self.showNormal)
             quit_action.triggered.connect(self.closeEvent)
             tray_menu = QMenu()
-            tray_menu.addAction(show_action)
+            # tray_menu.addAction(show_action)
             tray_menu.addAction(quit_action)
             self.tray_icon.setContextMenu(tray_menu)
 
@@ -43,7 +44,7 @@ class ApplicationWindow(ChangeUi):
     def closeEvent(self, event):
         try:
             if self.isVisible():
-                event.ignore()
+                # event.ignore()
                 self.hide()
                 self.tray_icon.show()
 
@@ -72,8 +73,8 @@ def main():
     print(txt_log)
     try:
         window.startParam()
+        time.sleep(1)
         window.threadInit()
-        window.initCheck()
         if window.set_port.connect_to_server == '1':
             window.initSocket()
 
