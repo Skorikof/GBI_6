@@ -3,8 +3,8 @@ import time
 from Thread import LogWriter, Reader, Writer, Connection
 from ReadSettings import COMSettings, DataSpan, DataSens, Registers
 from datetime import datetime
-from MainUi import Ui_MainWindow
-from PyQt5.QtWidgets import QMainWindow, QTabWidget
+from MainUi_cut import Ui_MainWindow
+from PyQt5.QtWidgets import QMainWindow, QTableWidgetItem
 from PyQt5.QtCore import QObject, pyqtSignal, QThreadPool
 
 
@@ -45,13 +45,10 @@ class ChangeUi(QMainWindow):
 
     def startParam(self):
         try:
-            self.ui.tabWidget.setCurrentIndex(0)
             if self.set_port.count_span == 1:
-                QTabWidget.setTabVisible(self.ui.tabWidget, 1, False)
                 self.check_cams(1, True)
 
             elif self.set_port.count_span == 2:
-                QTabWidget.setTabVisible(self.ui.tabWidget, 1, True)
                 self.check_cams(1, True)
                 time.sleep(0.1)
                 self.check_cams(2, True)
@@ -66,14 +63,14 @@ class ChangeUi(QMainWindow):
             self.saveLog('error', str(e))
 
     def thread_log(self, text):
-        self.ui.info_set_label.setText(text)
+        self.ui.label_info.setText(text)
         print(text)
         if self.set_port.create_log == '1':
             self.saveLog('info', text)
 
     def thread_error(self, text):
         print(text)
-        self.ui.info_label.setText(str(text))
+        self.ui.label_info.setText(str(text))
         self.saveLog('error', str(text))
 
     def initSocket(self):
@@ -153,21 +150,41 @@ class ChangeUi(QMainWindow):
     def readResult(self, span, arr):
         try:
             txt_log = 'Посылка от Базовой станции {} получена: {}'.format(span, str(datetime.now())[:-7])
-            self.ui.info_label.setText(txt_log)
+            self.ui.label_info.setText(txt_log)
             if self.set_port.create_log == '1':
                 self.saveLog('info', txt_log)
 
             for i in range(len(arr)):
                 self.fill_obj_data(span, i, arr[i])
 
+            self.fill_table_data(span, arr)
+
         except Exception as e:
             self.saveLog('error', str(e))
 
     def fill_obj_data(self, span, sens, arr):
         try:
-            self.dataCam.span[span - 1].sens[sens].temp = str(arr[0])
-            self.dataCam.span[span - 1].sens[sens].serial = str(arr[1])
-            self.dataCam.span[span - 1].sens[sens].bat = str(arr[2])
+            self.dataCam.span[span - 1].sens[sens].temp = arr[0]
+            self.dataCam.span[span - 1].sens[sens].serial = arr[1]
+            self.dataCam.span[span - 1].sens[sens].bat = arr[2]
+
+        except Exception as e:
+            self.saveLog('error', str(e))
+
+    def fill_table_data(self, span, arr):
+        try:
+            table_obj = None
+            if span == 1:
+                table_obj = self.ui.tableWidget
+            elif span == 2:
+                table_obj = self.ui.tableWidget_2
+
+            table_obj.setRowCount(len(arr))
+
+            for i in range(len(arr)):
+                table_obj.setItem(i, 0, QTableWidgetItem(arr[i][0]))
+                table_obj.setItem(i, 1, QTableWidgetItem(arr[i][1]))
+                table_obj.setItem(i, 2, QTableWidgetItem(arr[i][2]))
 
         except Exception as e:
             self.saveLog('error', str(e))

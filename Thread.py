@@ -69,7 +69,7 @@ class Connection(QRunnable):
                 while self.flag_connect:
                     try:
                         msg = self.sock.recv(1024)
-                        print(msg)
+                        # print(msg)
                         if msg == b'':
                             time.sleep(1)
                             txt_log = 'Соединение с сервером разорвано'
@@ -245,16 +245,16 @@ class Reader(QRunnable):
             if command == 'Temp':
                 val_temp = round(val_temp / 16, 1)
                 if val_temp <= 1 or val_temp > 125:
-                    return 1000
+                    return '1000'
 
             if command == 'Serial':
                 if val_temp <= 1 or val_temp > 1000:
-                    return 1000
+                    return '1000'
 
             if command == 'Bat':
                 val_temp = round(val_temp * 0.1, 1)
                 if val_temp <= 1 or val_temp > 4.9:
-                    return 1000
+                    return '1000'
 
             return str(val_temp)
 
