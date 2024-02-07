@@ -44,7 +44,7 @@ class ApplicationWindow(ChangeUi):
     def closeEvent(self, event):
         try:
             if self.isVisible():
-                # event.ignore()
+                event.ignore()
                 self.hide()
                 self.tray_icon.show()
 

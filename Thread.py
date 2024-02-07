@@ -160,8 +160,6 @@ class Writer(QRunnable):
 
         except ModEx as e:
             self.signals.thread_error.emit(e)
-            txt_log = 'write thread'
-            self.signals.thread_error.emit(txt_log)
             time.sleep(1)
 
         except Exception as e:
@@ -216,8 +214,6 @@ class Reader(QRunnable):
 
             except ModEx as e:
                 self.signals.thread_error.emit(str(e))
-                txt_log = 'read thread'
-                self.signals.thread_error.emit(txt_log)
                 time.sleep(1)
 
             except Exception as e:
