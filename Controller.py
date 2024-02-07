@@ -79,7 +79,7 @@ class ChangeUi(QMainWindow):
     def initSocket(self):
         try:
             self.connect = Connection(self.set_port.IP_adr, self.set_port.local_port)
-            self.connect.signals.thread_log_connect.connect(self.thread_log)
+            self.connect.signals.thread_log.connect(self.thread_log)
             self.connect.signals.thread_error.connect(self.thread_error)
             self.connect.signals.check_cell.connect(self.check_cams)
             self.connect.signals.connect_data.connect(self.sendData)
@@ -165,9 +165,9 @@ class ChangeUi(QMainWindow):
 
     def fill_obj_data(self, span, sens, arr):
         try:
-            self.dataCam.span[span - 1].sens[sens].temp = arr[0]
-            self.dataCam.span[span - 1].sens[sens].serial = arr[1]
-            self.dataCam.span[span - 1].sens[sens].bat = arr[2]
+            self.dataCam.span[span - 1].sens[sens].temp = str(arr[0])
+            self.dataCam.span[span - 1].sens[sens].serial = str(arr[1])
+            self.dataCam.span[span - 1].sens[sens].bat = str(arr[2])
 
         except Exception as e:
             self.saveLog('error', str(e))
