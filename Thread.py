@@ -10,11 +10,15 @@ base_dir = os.path.dirname(__file__)
 
 
 class ReadSignals(QObject):
-    thread_log = pyqtSignal(object)
-    thread_error = pyqtSignal(object)
-    read_result = pyqtSignal(int, list)
+    result_temp = pyqtSignal(int, str, list)
+    result_log = pyqtSignal(object)
+    result_log_connect = pyqtSignal(object)
+    connect_check = pyqtSignal(int, bool)
     connect_data = pyqtSignal(int)
+    lucky_attemp = pyqtSignal(int, bool)
     check_cell = pyqtSignal(int, bool)
+    error_read = pyqtSignal(object)
+    error_modbus = pyqtSignal(object)
 
 
 class LogWriter(QRunnable):
@@ -69,11 +73,11 @@ class Connection(QRunnable):
                 while self.flag_connect:
                     try:
                         msg = self.sock.recv(1024)
-                        # print(msg)
+                        print(msg)
                         if msg == b'':
                             time.sleep(1)
                             txt_log = 'Соединение с сервером разорвано'
-                            self.signals.thread_log.emit(txt_log)
+                            self.signals.result_log_connect.emit(txt_log)
                             self.flag_connect = False
                             self.sock.close()
                             self.startConnect()
@@ -81,22 +85,26 @@ class Connection(QRunnable):
                         elif msg == b'Hello! ASU server welcomes you!':
                             self.sock.send(b'Connection OK')
                             txt_log = 'Соединение с сервером установлено'
-                            self.signals.thread_log.emit(txt_log)
+                            self.signals.result_log_connect.emit(txt_log)
 
-                        elif msg[:3] == b'GET':
+                        elif msg[:3] == b'KAM':
                             temp_list = msg.decode(encoding='utf-8').split(',')
-                            span = int(temp_list[1])
+                            camera = int(temp_list[1])
                             command = temp_list[2]
+                            if command == 'ON':
+                                self.signals.connect_check.emit(camera, True)
+                            if command == 'OFF':
+                                self.signals.connect_check.emit(camera, False)
                             if command == 'DATA':
-                                self.signals.connect_data.emit(span)
+                                self.signals.connect_data.emit(camera)
 
                     except Exception as e:
-                        self.signals.thread_error.emit(e)
+                        self.signals.error_read.emit(e)
                         self.flag_connect = False
                         self.sock.close()
 
         except Exception as e:
-            self.signals.thread_error.emit(e)
+            self.signals.error_read.emit(e)
 
     def startConnect(self):
         try:
@@ -105,26 +113,26 @@ class Connection(QRunnable):
             self.sock = socket.socket()
             self.sock.connect((self.ip, self.port))
             txt_log = 'Соединение с сервером..'
-            self.signals.thread_log.emit(txt_log)
+            self.signals.result_log_connect.emit(txt_log)
             self.flag_connect = True
 
         except Exception as e:
             self.flag_connect = False
             txt_log = 'Соединение потеряно'
             self.sock.close()
-            self.signals.thread_log.emit(txt_log)
-            self.signals.thread_error.emit(e)
+            self.signals.result_log_connect.emit(txt_log)
+            self.signals.error_read.emit(e)
 
     def sendData(self, msg):
         self.sock.send(msg)
         txt_log = 'Посылка отправлена на сервер: ' + str(datetime.now())[:-7]
-        self.signals.thread_log.emit(txt_log)
+        self.signals.result_log_connect.emit(txt_log)
 
     def closeConnect(self):
         self.cycle = False
         self.sock.close()
         txt_log = 'Разрыв соединения'
-        self.signals.thread_log.emit(txt_log)
+        self.signals.result_log_connect.emit(txt_log)
 
 
 class Writer(QRunnable):
@@ -141,7 +149,6 @@ class Writer(QRunnable):
         try:
             if self.command:
                 rq = self.client.write_registers(8192, [1], slave=self.adr_dev)
-                time.sleep(0.1)
                 if not rq.isError():
                     txt_log = 'Попытка подключения Базовой станции №' + str(self.adr_dev)
                 else:
@@ -150,33 +157,34 @@ class Writer(QRunnable):
 
             else:
                 rq = self.client.write_registers(8192, [0], slave=self.adr_dev)
-                time.sleep(0.1)
                 if not rq.isError():
                     txt_log = 'Попытка отключения Базовой станции №' + str(self.adr_dev)
                 else:
                     txt_log = 'Неудачная попытка отключения Базовой станции №' + str(self.adr_dev)
                     self.signals.check_cell.emit(self.adr_dev, True)
-            Reader.signals.thread_log.emit(txt_log)
+            Reader.signals.result_log.emit(txt_log)
 
         except ModEx as e:
-            self.signals.thread_error.emit(e)
+            self.signals.error_modbus.emit(e)
             time.sleep(1)
 
         except Exception as e:
-            self.signals.thread_error.emit(e)
+            self.signals.error_read.emit(e)
 
 
 class Reader(QRunnable):
     signals = ReadSignals()
 
-    def __init__(self, client, count_span):
+    def __init__(self, client, cell_list):
         super(Reader, self).__init__()
         self.cycle = True
         self.is_run = False
         self.client = client
-        self.count_span = count_span
         self.is_paused = False
         self.is_killed = False
+        self.start_reg = 4101
+        # self.sens_regs = [4103, 4108, 4113]
+        self.cell_list = cell_list
 
     @pyqtSlot()
     def run(self):
@@ -185,50 +193,63 @@ class Reader(QRunnable):
                 if not self.is_run:
                     time.sleep(1)
                 else:
-                    for i in range(1, self.count_span + 1):
-                        adr_span = i
-
+                    for i in range(len(self.cell_list)):
+                        cell_num = int(self.cell_list[i])
                         temp_arr = []
-                        start_reg = 4121
-                        for j in range(2):
-                            rr = self.client.read_holding_registers(start_reg, 60, slave=adr_span)
-                            if not rr.isError():
-                                for reg in range(0, len(rr.registers), 5):
-                                    temp_list = []
-                                    temper = self.dopCodeBintoDec('Temp', bin(rr.registers[reg + 2])[2:].zfill(16))
-                                    temp_list.append(temper)
-                                    serial = self.dopCodeBintoDec('Serial', bin(rr.registers[reg + 3])[2:].zfill(16))
-                                    temp_list.append(serial)
-                                    volt = self.dopCodeBintoDec('Bat', bin(rr.registers[reg + 4])[2:].zfill(8))
-                                    temp_list.append(volt)
+                        rr = self.client.read_holding_registers(8192, 1, slave=cell_num)
+                        time.sleep(0.1)
+                        if not rr.isError():
+                            if rr.registers[0] == 1:
+                                self.signals.check_cell.emit(cell_num, True)
+                                state = 'on'
+                                start_reg = 4121
+                                for j in range(2):
+                                    rr = self.client.read_holding_registers(start_reg, 60, slave=cell_num)
+                                    for reg in range(0, len(rr.registers), 5):
+                                        temp_list = []
+                                        temper = self.dopCodeBintoDec('Temp', bin(rr.registers[reg + 2])[2:].zfill(16))
+                                        temp_list.append(temper)
+                                        serial = self.dopCodeBintoDec('Serial', bin(rr.registers[reg + 3])[2:].zfill(16))
+                                        temp_list.append(serial)
+                                        volt = self.dopCodeBintoDec('Bat', bin(rr.registers[reg + 4])[2:].zfill(8))
+                                        temp_list.append(volt)
 
-                                    temp_arr.append(temp_list)
-                                start_reg = 4181
+                                        temp_arr.append(temp_list)
+                                    start_reg = 4181
 
                             else:
-                                txt_log = 'Базовая станция №' + str(adr_span) + ' не отвечает'
-                                self.signals.thread_log.emit(txt_log)
+                                self.signals.check_cell.emit(cell_num, False)
+                                state = 'off'
+                                for j in range(3):
+                                    temp_arr.append(['off', 'off', 'off'])
 
-                        self.signals.read_result.emit(adr_span, temp_arr)
-                        time.sleep(5)
+                        else:
+                            txt_log = 'Базовая станция №' + str(i) + ' не отвечает'
+                            self.signals.result_log.emit(txt_log)
+                            state = 'err'
+                            for j in range(3):
+                                temp_arr.append(['err', 'err', 'err'])
+
+                        self.signals.result_temp.emit(cell_num, state, temp_arr)
+                        time.sleep(0.1)
 
             except ModEx as e:
-                self.signals.thread_error.emit(str(e))
+                self.signals.error_modbus.emit(str(e))
                 time.sleep(1)
 
             except Exception as e:
-                self.signals.thread_error.emit(e)
+                self.signals.error_read.emit(e)
 
     def startProcess(self):
         self.cycle = True
         self.is_run = True
         txt_log = 'Процесс чтения запущен'
-        self.signals.thread_log.emit(txt_log)
+        self.signals.result_log.emit(txt_log)
 
     def exitProcess(self):
         self.cycle = False
         txt_log = 'Выход из процесса чтения'
-        self.signals.thread_log.emit(txt_log)
+        self.signals.result_log.emit(txt_log)
 
     def dopCodeBintoDec(self, command, value, bits=16):
         """Переводит бинарную строку в двоичном коде в десятичное число"""
@@ -240,19 +261,19 @@ class Reader(QRunnable):
 
             if command == 'Temp':
                 val_temp = round(val_temp / 16, 1)
-                if val_temp <= 1 or val_temp > 125:
-                    return '1000'
+                if val_temp < -125 or val_temp > 125:
+                    return '-----'
 
             if command == 'Serial':
-                if val_temp <= 1 or val_temp > 1000:
-                    return '1000'
+                if val_temp < 1 or val_temp > 30000:
+                    return '-----'
 
             if command == 'Bat':
                 val_temp = round(val_temp * 0.1, 1)
-                if val_temp <= 1 or val_temp > 4.9:
-                    return '1000'
+                if val_temp < 0.1 or val_temp > 4.9:
+                    return '-----'
 
             return str(val_temp)
 
         except Exception as e:
-            self.signals.thread_error.emit(e)
+            self.signals.error_read.emit(e)
